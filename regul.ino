@@ -6,13 +6,16 @@
 #define CLIMPIN 19
 #define RADPIN 21
 #define FANPIN 27
-#define TACHPIN 26
 #define LEDSTRIPPIN 13
 #define NUMLEDS 5
 
 // Seuil
 #define SB 24
 #define SH 26
+#define LIGHTMAX 3500
+int onMax = 0;
+
+   
 
 
 // Config de température 
@@ -59,6 +62,30 @@ void controlLedStrip(float t){
   }
 }
 
+void controlFan(float t, int light){
+
+  digitalWrite(2, LOW);
+  if(t < SH){
+      ledcWrite(FANPIN, 0);
+      onMax = 0;
+  }else{
+    if(light < LIGHTMAX){
+      if(onMax != 1){
+        for(int i = 1 ; i <= 255; i = i+10){
+          ledcWrite(FANPIN, i);
+          delay(1000);
+        }
+        onMax = 1;
+      } else{
+        ledcWrite(FANPIN, 255);
+      }
+    } else{
+      digitalWrite(2, HIGH);
+      ledcWrite(FANPIN, 0);
+      onMax = 0;
+    }  
+  }
+}
 
 void setup() {
   Serial.begin(9600);
@@ -69,21 +96,25 @@ void setup() {
   // init ledPins as an OUTPUT
   pinMode(CLIMPIN, OUTPUT);
   pinMode(RADPIN, OUTPUT);
+  pinMode(2, OUTPUT); // led d'incendie
 
   // init ledStrip
   strip.begin();
 
   // init fan
-  //ledcAttach(FANPIN, 25000, 8);
-  //attachInterrupt(digitalPinToInterrupt(TACHPIN), isr, RISING);
+  ledcAttach(FANPIN, 0, 8);
 }
 
 void loop() {
   float temperature = getTemperature();
+  int light = 4095 - analogRead(A5);
   Serial.print(temperature);
   Serial.println(" °C");
+  Serial.println(light);
+
   controlLeds(temperature);
   controlLedStrip(temperature);
-   
+  controlFan(temperature, light);
+  
   delay(1000);
 }
