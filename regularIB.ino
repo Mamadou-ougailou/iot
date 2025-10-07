@@ -3,7 +3,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <Arduino.h>
 
-// Pins
+////////////////////// Pins //////////////
 #define CLIMPIN 19
 #define RADPIN 18
 #define FANPIN 27
@@ -16,8 +16,10 @@
 #define SB 25
 #define SH 26
 
+int onMax = 0;
+
 // Seuil de luminosité 
-#define LUM_THRESHOLD 1000  
+#define LIGHTMAX 3500  
 
 //Configuration du temperature
 OneWire oneWire(23);
@@ -26,21 +28,26 @@ DallasTemperature tempSensor(&oneWire);
 //Config du leds Strip
 Adafruit_NeoPixel strip(NUMLEDS, LEDSTIPPIN, NEO_GRB + NEO_KHZ800);
 
-int num = 0;  // Compteur d'impulsions du tachymètre
 
 
 
+/////////////////// TEMPERATURE ///////////////////
 //Pour obtenir la température
 float getTemperature() {
   tempSensor.requestTemperatures();
   return tempSensor.getTempCByIndex(0);
 }
 
+
+//////////////// LUMIERE //////////////////////////
 //Pour lire la luminosité depuis la photoresistance
 int getlumiosite() {
   return analogRead(LDRPIN); // valeur entre 0 et 4095
 }
 
+
+
+/////////////////// LEDS //////////////////////////
 //Pour controoler les leds (climatiseur et radiateur)
 void ControlLeds(float temp) {
   if (temp >= SH) {
@@ -55,6 +62,8 @@ void ControlLeds(float temp) {
   }
 }
 
+
+/////////////////// LEDS STRIP //////////////////
 // Pour partager la meme couleur sur la bande de leds Strip
 void setLeds(uint32_t color) {
   for (int i = 0; i < NUMLEDS; i++) {
@@ -72,44 +81,39 @@ void ControlLedsStrip(float temp) {
     // vert
     setLeds(strip.Color(0, 255, 0)); 
   else
-    // bleu
-    setLeds(strip.Color(0, 0, 255)); 
+    // Orange
+    setLeds(strip.Color(255, 165, 0)); 
 }
 
-// Appeler chaque tour du ventilo 
-void IRAM_ATTR isr() {
-  num++;
-}
 
+/////////////////// FAN /////////////////////////////////
 // Pour controler le ventilateur selon la température
-void ControlVentilo(float t) {
-  if (t >= SH) {
-    ledcWrite(FANPIN, 255);  // max vitesse
-  } else if (t <= SB) {
-    ledcWrite(FANPIN, 0);    // off
-  } else {
-    ledcWrite(FANPIN, 127);  // moyenne
+void ControlFan(float t, int ligth) {
+  digitalWrite(2, LOW);
+  if(t < SH){
+    ledcWrite(FANPIN, 0);
+    onMax = 0;
+  }else{
+    if(ligth < LIGHTMAX){
+      if(onMax != 1){
+        for(int i=1;i <= 255; i = i+10){
+          ledcWrite(FANPIN, i);
+        }
+        onMax = 1;
+      }else{
+        ledcWrite(FANPIN, 255);
+      }
+    }else{
+      digitalWrite(2,HIGH);
+      ledcWrite(FANPIN, 0);
+      onMax = 0; 
+    }
   }
 }
 
 
- // Si présence de lumière -> le ventillo s'éteint et le strip devient rouge
-void ControlLumiere( int lumiosite, float temperature ){
-    if (lumiosite < LUM_THRESHOLD) {
-    ledcWrite(FANPIN, 0);  // Éteindre le ventilateur
-    setLeds(strip.Color(255, 0, 0));  // LEDs rouges
-  } 
-  // Sinon -> fonctionnement normal selon la température
-  else {
-    ControlLeds(temperature);
-    ControlLedsStrip(temperature);
-    ControlVentilo(temperature);
-  }
-
-}
-
-
-void setup() {
+///////////////////// INITIALISATION /////////////////////
+void initialisation(){
   Serial.begin(9600);
 
   // Init du capteur de température et du bus OneWire
@@ -122,29 +126,34 @@ void setup() {
   //Initialisation des leds du climatiseur / radiateur
   pinMode(CLIMPIN, OUTPUT);
   pinMode(RADPIN, OUTPUT);
+  pinMode(2, OUTPUT);
 
   //Configuration du ventilateur 
   ledcAttach(FANPIN, 25000, 8);
+}
 
-  // Attache de l'interruption pour le tachymètre
-  attachInterrupt(digitalPinToInterrupt(TACHPIN), isr, RISING);
+void setup() {
+  initialisation();
 }
 
 
-
-void loop() {
+////////////////////// APEL DES FONCTIONS ///////////////////////
+void appel(){
   // Lecture de la température
   float temperature = getTemperature();
-
-  // Lecture de la luminosité (photoresistor)
-  int luminosite = getlumiosite();
+  
+  int light = 4095 - analogRead(A5);
 
   // Affichage dans le moniteur série
   Serial.print("Temperature: ");
   Serial.print(temperature);
   Serial.print(" °C | Luminosite: ");
-  Serial.println(luminosite);
-  
-  ControlLumiere(luminosite,temperature );
-  
+  Serial.println(light);
+  ControlFan(temperature, light);
+  ControlLedsStrip(temperature);
+  ControlLeds(temperature);
+}
+
+void loop() {
+  appel(); 
 }
