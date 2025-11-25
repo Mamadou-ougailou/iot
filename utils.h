@@ -14,9 +14,9 @@
 #define NUMLEDS 5
 
 // Seuil
-#define SB 25.8
-#define SH 26
 #define LIGHTMAX 3500
+extern float SB = 25.8;
+extern float SH = 26;
 
 extern int luminosity;
 extern float temperature;

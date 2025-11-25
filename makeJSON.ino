@@ -17,7 +17,14 @@ StaticJsonDocument<1000> makeJSON_fromStatus(esp_model *em){
   JsonObject status = doc.createNestedObject("status");
   status["temperature"] = em->temperature;
   status["light"] = em->luminosity;
-  status["regul"] = (em->coolerState || em->heaterState) ? (em->coolerState ? "COLD" : "HEAT") : "HALT";
+
+  if (em->coolerState|| em->fireDetected)
+    status["regul"] = "COLD";
+  else if (em->heaterState)
+    status["regul"] =  "HEAT";
+  else
+    status["regul"] = "HALT";
+
   status["fire"] = em->fireDetected;
   status["heat"] = em->heaterState ? "ON" : "OFF";
   status["cold"] = em->coolerState ? "ON" : "OFF";
@@ -44,7 +51,7 @@ StaticJsonDocument<1000> makeJSON_fromStatus(esp_model *em){
 
   // Net section
   JsonObject net = doc.createNestedObject("net");
-  net["uptime"] = 0; // Example: System uptime
+  net["uptime"] = "0"; // Example: System uptime
   net["ssid"] = "NOP";
   net["mac"] = "NOP";
   net["ip"] = "NOP";

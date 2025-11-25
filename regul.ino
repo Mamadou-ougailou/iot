@@ -5,6 +5,9 @@
 void setup() {
   Serial.begin(9600);
 
+  while(!Serial){
+    ; // Wait
+  }
   // init du capteur et de OneWire
   tempSensor.begin();
 
@@ -19,6 +22,8 @@ void setup() {
 void loop() {
   temperature = getTemperature();
   luminosity = 4095 - analogRead(A5);
+
+  getThresholds();
   
   checkStatus(temperature, luminosity);
   controlSensors();

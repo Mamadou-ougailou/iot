@@ -35,7 +35,22 @@ void initFan(){
   ledcAttach(FANPIN, 25000, 8);
   ledcWrite(FANPIN, 0);
 }
-
+void getThresholds(){
+    if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
+    if (data.startsWith("LT:")) {
+      int ltIndex = data.indexOf("LT:") + 3;
+      int commaIndex = data.indexOf(",");
+      int htIndex = data.indexOf("HT:") + 3;
+      if (commaIndex > ltIndex && htIndex > commaIndex) {
+        String ltStr = data.substring(ltIndex, commaIndex);
+        String htStr = data.substring(htIndex);
+        SB = ltStr.toFloat();
+        SH = htStr.toFloat();
+      }
+    }
+  }
+}
 float getTemperature(){
   float t;
   tempSensor.requestTemperatures();
@@ -49,16 +64,21 @@ void setLEDS(uint32_t color) {
   }
   strip.show();
 }
+void progressiveFan() {
+  static unsigned long previousMillisFan = 0;
+  unsigned long currentMillis = millis();
 
-void progressiveFan(){
-  if(fanSpeed == 0){
-    for(int i = 64 ; i < 256; i += 64){
-      ledcWrite(FANPIN, i);
-      delay(1000);
-    }
-    fanSpeed = 255;
-  } else {
-    ledcWrite(FANPIN, 255);
+  if (fanSpeed == 0) {
+    fanSpeed = 64; // Démarrer la progression
+    ledcWrite(FANPIN, fanSpeed);
+    previousMillisFan = currentMillis;
+  } else if (fanSpeed < 255 && currentMillis - previousMillisFan >= 1000) {
+    fanSpeed += 64; // Passer à l'étape suivante
+    if (fanSpeed > 255) fanSpeed = 255; // Limiter à 255
+    ledcWrite(FANPIN, fanSpeed);
+    previousMillisFan = currentMillis;
+  } else if (fanSpeed != 0 && fanSpeed != 64 && fanSpeed != 128 && fanSpeed != 192 && fanSpeed != 255) {
+    ledcWrite(FANPIN, fanSpeed); // Appliquer fanSpeed dynamique si hors progression
   }
 }
 
@@ -101,7 +121,7 @@ void controlSensors(){
       digitalWrite(RADPIN, HIGH);
       digitalWrite(CLIMPIN, LOW);
     } else if(fireDetected){
-      setLEDS(strip.Color(255, 255, 255));
+      setLEDS(strip.Color(255, 0, 0));
       digitalWrite(2, HIGH);
       digitalWrite(RADPIN, LOW);
       digitalWrite(CLIMPIN, LOW);
